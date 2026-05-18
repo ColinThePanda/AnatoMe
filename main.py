@@ -12,7 +12,6 @@ class Params:
     duration: float = 2
     food_eaten: float = 250
     body_mass: float = 70
-    age: float = 25
     metab_preset: float = 1.0
     aldh_efficiency: float = 1.0
     body_water_fraction: float = 0.68
@@ -29,8 +28,6 @@ class Params:
             raise ValueError("food_eaten cannot be negative")
         if self.body_mass <= 0:
             raise ValueError("body_mass must be greater than 0")
-        if self.age <= 0:
-            raise ValueError("age must be greater than 0")
         if self.metab_preset <= 0:
             raise ValueError("metab_preset must be greater than 0")
         if self.aldh_efficiency <= 0:
@@ -87,12 +84,12 @@ class Simulation:
         k_empty_base_h = 2.5
         k_empty_h = k_empty_base_h / (1 + 4 * food_factor)
         kS_h = 0.15
-        Ka_base_h = 60 * (0.0767 * (26.8 / self.params.age) ** 1.4)
+        Ka_base_h = 4.6
         Ka_h = Ka_base_h / (1 + 0.75 * food_factor)
 
-        Vd_l = 77 * (self.params.body_mass / 61.3) ** 0.826 * (self.params.age / 26.8) ** 0.564
+        Vd_l = self.params.body_water_fraction * self.params.body_mass
         C_ethanol = 1000 * B / (46.068 * Vd_l)
-        Vmax_ethanol = 3.256 * (self.params.age / 26.8) ** 0.399 * self.params.metab_preset
+        Vmax_ethanol = 3.256 * self.params.metab_preset
         E_g_h = (Vmax_ethanol * C_ethanol / (0.8183 + C_ethanol)) * (46.068 / 1000) * 60 if C_ethanol > 0 else 0
         E_g_h = min(E_g_h, B / dt)
 
@@ -158,8 +155,7 @@ def main() -> None:
         duration: float = float(st.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f"))
         food_eaten: int = int(st.slider("Food eaten (grams)", 0, 1500, 250, 50))
         body_mass: int = int(st.slider("Body mass (kg)", 30, 150, 70, 1))
-        age: int = int(st.slider("Age", 18, 80, 25, 1))
-        total_time: int = int(st.slider("Simulation time (hours)", 2, 24, 12, 1))
+        total_time: int = int(st.slider("Simulation time (hours)", 2, 32, 12, 1))
 
         metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
         aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
@@ -167,7 +163,7 @@ def main() -> None:
         run: bool = bool(st.form_submit_button("Run simulation"))
 
     if run:
-        params: Params = Params(dt=1 / 60, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, age=age, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
+        params: Params = Params(dt=1 / 60, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
 
         sim: Simulation = Simulation(params)
         sim.simulate()
@@ -212,7 +208,6 @@ def main() -> None:
         "duration": duration,
         "food_eaten": food_eaten,
         "body_mass": body_mass,
-        "age": age,
         "total_time": total_time,
         "metab_choice": metab_choice,
         "aldh_choice": aldh_choice,
@@ -223,7 +218,6 @@ def main() -> None:
         "duration": displayed_params.duration,
         "food_eaten": displayed_params.food_eaten,
         "body_mass": displayed_params.body_mass,
-        "age": displayed_params.age,
         "total_time": displayed_params.total_time,
         "metab_choice": displayed_metab_choice,
         "aldh_choice": displayed_aldh_choice,
@@ -235,7 +229,6 @@ def main() -> None:
             f"{displayed_params.duration:.1f} h duration, "
             f"{displayed_params.food_eaten:g} g food, "
             f"{displayed_params.body_mass:g} kg, "
-            f"age {displayed_params.age:g}, "
             f"{displayed_params.total_time:g} h simulation, "
             f"{displayed_metab_choice} metabolism, "
             f"{displayed_aldh_choice} ALDH."
