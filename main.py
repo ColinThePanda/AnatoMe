@@ -79,13 +79,12 @@ class Simulation:
 
         dose_g = 14 * self.params.drinks
         input_g_h = dose_g / self.params.duration if self.time_hrs < self.params.duration else 0
-
         food_factor = self.params.food_eaten / (self.params.food_eaten + 500)
-        k_empty_base_h = 2.5
-        k_empty_h = k_empty_base_h / (1 + 4 * food_factor)
-        kS_h = 0.15
-        Ka_base_h = 4.6
-        Ka_h = Ka_base_h / (1 + 0.75 * food_factor)
+        k_empty_base_h = 4.2
+        k_empty_h = k_empty_base_h / (1 + 4.5 * food_factor)
+        kS_h = 0.22
+        Ka_base_h = 7.0
+        Ka_h = Ka_base_h / (1 + 1.0 * food_factor)
 
         Vd_l = self.params.body_water_fraction * self.params.body_mass
         C_ethanol = 1000 * B / (46.068 * Vd_l)
