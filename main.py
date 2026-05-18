@@ -83,10 +83,12 @@ class Simulation:
         dose_g = 14 * self.params.drinks
         input_g_h = dose_g / self.params.duration if self.time_hrs < self.params.duration else 0
 
-        f_stomach = 0.15 + 0.15 * (self.params.food_eaten / (self.params.food_eaten + 500))
-        k_empty_h = 2.5
-        kS_h = f_stomach * k_empty_h / (1 - f_stomach)
-        Ka_h = 60 * (0.0767 * (26.8 / self.params.age) ** 1.4)
+        food_factor = self.params.food_eaten / (self.params.food_eaten + 500)
+        k_empty_base_h = 2.5
+        k_empty_h = k_empty_base_h / (1 + 4 * food_factor)
+        kS_h = 0.15
+        Ka_base_h = 60 * (0.0767 * (26.8 / self.params.age) ** 1.4)
+        Ka_h = Ka_base_h / (1 + 0.75 * food_factor)
 
         Vd_l = 77 * (self.params.body_mass / 61.3) ** 0.826 * (self.params.age / 26.8) ** 0.564
         C_ethanol = 1000 * B / (46.068 * Vd_l)
@@ -136,23 +138,33 @@ def main() -> None:
 
     st.sidebar.header("Simulation Parameters")
 
-    drinks: int = int(st.sidebar.slider("Drinks consumed", 0, 12, 3, 1))
-    duration: float = float(st.sidebar.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f"))
-    food_eaten: int = int(st.sidebar.slider("Food eaten (grams)", 0, 1500, 250, 50))
-    body_mass: int = int(st.sidebar.slider("Body mass (kg)", 30, 150, 70, 1))
-    age: int = int(st.sidebar.slider("Age", 18, 80, 25, 1))
-    total_time: int = int(st.sidebar.slider("Simulation time (hours)", 2, 24, 12, 1))
+    metab_values: dict[str, float] = {
+        "Slow": 0.75,
+        "Average": 1.0,
+        "Fast": 1.25,
+    }
 
-    metab_choice: str = str(st.sidebar.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
-    aldh_choice: str = str(st.sidebar.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
-
-    metab_values: dict[str, float] = {"Slow": 0.75, "Average": 1.0, "Fast": 1.25}
-    aldh_values: dict[str, float] = {"Normal": 1.0, "Reduced": 0.70, "Very reduced": 0.55}
+    aldh_values: dict[str, float] = {
+        "Normal": 1.0,
+        "Reduced": 0.70,
+        "Very reduced": 0.55,
+    }
 
     if "results" not in st.session_state:
         st.session_state["results"] = None
 
-    run: bool = bool(st.button("Run simulation"))
+    with st.sidebar.form("simulation_form"):
+        drinks: int = int(st.slider("Drinks consumed", 0, 12, 3, 1))
+        duration: float = float(st.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f"))
+        food_eaten: int = int(st.slider("Food eaten (grams)", 0, 1500, 250, 50))
+        body_mass: int = int(st.slider("Body mass (kg)", 30, 150, 70, 1))
+        age: int = int(st.slider("Age", 18, 80, 25, 1))
+        total_time: int = int(st.slider("Simulation time (hours)", 2, 24, 12, 1))
+
+        metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
+        aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
+
+        run: bool = bool(st.form_submit_button("Run simulation"))
 
     if run:
         params: Params = Params(dt=1 / 60, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, age=age, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
@@ -283,6 +295,7 @@ def main() -> None:
     st.subheader("Graphs")
 
     graph_col1, graph_col2 = st.columns(2)
+    graph_col3, graph_col4 = st.columns(2)
 
     with graph_col1:
         st.write("BAC Over Time")
@@ -321,6 +334,44 @@ def main() -> None:
         ax.legend(fontsize=7)
 
         st.pyplot(fig, use_container_width=True)
+    
+    with graph_col3:
+        st.write("Absorption and Elimination Rates")
+
+        fig, ax = plt.subplots(figsize=(6, 3.5), constrained_layout=True)
+
+        ax.plot(df["time_hrs"], df["ethanol_absorption_g_h"], label="Ethanol absorption", linewidth=2,)
+        ax.plot(df["time_hrs"], df["ethanol_elimination_g_h"], label="Ethanol elimination", linewidth=2,)
+        ax.plot(df["time_hrs"], df["acetaldehyde_elimination_g_h"], label="Acetaldehyde elimination", linewidth=2,)
+
+        add_drink_lines(ax)
+
+        ax.set_xlabel("Time (hours)")
+        ax.set_ylabel("Rate (g/h)")
+        ax.set_title("Absorption and Elimination Rates")
+        ax.set_xlim(0, displayed_total_time)
+        ax.grid(True)
+        ax.legend(fontsize=7)
+
+        st.pyplot(fig, use_container_width=True)
+
+    with graph_col4:
+        st.write("Acetaldehyde Over Time")
+
+        fig, ax = plt.subplots(figsize=(6, 3.5), constrained_layout=True)
+
+        ax.plot(df["time_hrs"], df["acetaldehyde_g"], label="Acetaldehyde amount", linewidth=2,)
+
+        add_drink_lines(ax)
+
+        ax.set_xlabel("Time (hours)")
+        ax.set_ylabel("Acetaldehyde (g)")
+        ax.set_title("Acetaldehyde Over Time")
+        ax.set_xlim(0, displayed_total_time)
+        ax.grid(True)
+        ax.legend(fontsize=7)
+
+        st.pyplot(fig, use_container_width=True)
 
     st.subheader("Extra Stats")
 
@@ -330,8 +381,12 @@ def main() -> None:
     max_elimination_rate: float = float(df["ethanol_elimination_g_h"].max())
 
     peak_acetaldehyde = df.loc[df["acetaldehyde_g"].idxmax()]
-    peak_acetaldehyde_g: float = float(peak_acetaldehyde["acetaldehyde_g"])
-    peak_acetaldehyde_time: float = float(peak_acetaldehyde["time_hrs"])
+    try:
+        peak_acetaldehyde_g: float = float(peak_acetaldehyde["acetaldehyde_g"])
+        peak_acetaldehyde_time: float = float(peak_acetaldehyde["time_hrs"])
+    except ValueError:
+        print("Unreachable")
+        return
 
     acetaldehyde_exposure: float = float((df["acetaldehyde_concentration_mmol_l"] * displayed_params.dt).sum())
 
