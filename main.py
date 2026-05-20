@@ -158,11 +158,13 @@ def main() -> None:
 
         metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
         aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
+        
+        resolution: int = st.slider("Resolution (points/hour)", 1, 240, 60, 1)
 
         run: bool = bool(st.form_submit_button("Run simulation"))
 
     if run:
-        params: Params = Params(dt=1 / 60, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
+        params: Params = Params(dt=1/resolution, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
 
         sim: Simulation = Simulation(params)
         sim.simulate()
