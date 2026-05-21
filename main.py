@@ -7,7 +7,6 @@ from matplotlib.axes import Axes
 
 @dataclass
 class Params:
-    dt: float = 1 / 60
     drinks: float = 3
     duration: float = 2
     food_eaten: float = 250
@@ -18,8 +17,6 @@ class Params:
     total_time: float = 12
 
     def __post_init__(self):
-        if self.dt <= 0:
-            raise ValueError("dt must be greater than 0")
         if self.duration <= 0:
             raise ValueError("duration must be greater than 0")
         if self.drinks < 0:
@@ -60,6 +57,7 @@ class SimulationData:
 
 class Simulation:
     def __init__(self, params: Params | None = None):
+        self.sim_rate: float = 1 / 600
         self.params = params if params is not None else Params()
         self.time_hrs = 0.0
         self.stomach_ethanol_g = 0.0
@@ -70,7 +68,7 @@ class Simulation:
         self.sim_data: list[SimulationData] = []
 
     def step(self):
-        dt = self.params.dt
+        sr = self.sim_rate
         S = self.stomach_ethanol_g
         I = self.intestine_ethanol_g
         B = self.body_ethanol_g
@@ -90,13 +88,13 @@ class Simulation:
         C_ethanol = 1000 * B / (46.068 * Vd_l)
         Vmax_ethanol = 3.256 * self.params.metab_preset
         E_g_h = (Vmax_ethanol * C_ethanol / (0.8183 + C_ethanol)) * (46.068 / 1000) * 60 if C_ethanol > 0 else 0
-        E_g_h = min(E_g_h, B / dt)
+        E_g_h = min(E_g_h, B / sr)
 
         C_acetaldehyde = 1000 * H / (44.053 * Vd_l)
         liver_mass_kg = 0.026 * self.params.body_mass
         Vmax_acetaldehyde = 2.7 * liver_mass_kg * self.params.aldh_efficiency
         EH_g_h = (Vmax_acetaldehyde * C_acetaldehyde / (0.0012 + C_acetaldehyde)) * (44.053 / 1000) * 60 if C_acetaldehyde > 0 else 0
-        EH_g_h = min(EH_g_h, H / dt)
+        EH_g_h = min(EH_g_h, H / sr)
         
         stomach_to_body_g_h = kS_h * S
         stomach_to_intestine_g_h = k_empty_h * S
@@ -109,11 +107,11 @@ class Simulation:
         dH_g_h = E_g_h * (44.053 / 46.068) - EH_g_h
         dAc_g_h = EH_g_h * (59.044 / 44.053)
 
-        self.stomach_ethanol_g = max(S + dt * dS_g_h, 0)
-        self.intestine_ethanol_g = max(I + dt * dI_g_h, 0)
-        self.body_ethanol_g = max(B + dt * dB_g_h, 0)
-        self.acetaldehyde_g = max(H + dt * dH_g_h, 0)
-        self.acetate_g = max(Ac + dt * dAc_g_h, 0)
+        self.stomach_ethanol_g = max(S + sr * dS_g_h, 0)
+        self.intestine_ethanol_g = max(I + sr * dI_g_h, 0)
+        self.body_ethanol_g = max(B + sr * dB_g_h, 0)
+        self.acetaldehyde_g = max(H + sr * dH_g_h, 0)
+        self.acetate_g = max(Ac + sr * dAc_g_h, 0)
 
         C_ethanol = 1000 * self.body_ethanol_g / (46.068 * Vd_l)
         C_acetaldehyde = 1000 * self.acetaldehyde_g / (44.053 * Vd_l)
@@ -124,7 +122,7 @@ class Simulation:
     def simulate(self):
         while self.time_hrs < self.params.total_time:
             self.step()
-            self.time_hrs += self.params.dt
+            self.time_hrs += self.sim_rate
 
 
 def main() -> None:
@@ -142,8 +140,8 @@ def main() -> None:
 
     aldh_values: dict[str, float] = {
         "Normal": 1.0,
-        "Reduced": 0.70,
-        "Very reduced": 0.55,
+        "Reduced": 0.7,
+        "Very reduced": 0.5,
     }
 
     if "results" not in st.session_state:
@@ -158,13 +156,19 @@ def main() -> None:
 
         metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
         aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
-        
-        resolution: int = st.slider("Resolution (points/hour)", 1, 240, 60, 1)
 
         run: bool = bool(st.form_submit_button("Run simulation"))
 
     if run:
-        params: Params = Params(dt=1/resolution, drinks=drinks, duration=duration, food_eaten=food_eaten, body_mass=body_mass, metab_preset=metab_values[metab_choice], aldh_efficiency=aldh_values[aldh_choice], total_time=total_time)
+        params: Params = Params(
+            drinks=drinks,
+            duration=duration,
+            food_eaten=food_eaten,
+            body_mass=body_mass,
+            metab_preset=metab_values[metab_choice],
+            aldh_efficiency=aldh_values[aldh_choice],
+            total_time=total_time,
+        )
 
         sim: Simulation = Simulation(params)
         sim.simulate()
@@ -188,6 +192,7 @@ def main() -> None:
             "params": params,
             "metab_choice": metab_choice,
             "aldh_choice": aldh_choice,
+            "sim_rate": sim.sim_rate,
         }
 
     if st.session_state["results"] is None:
@@ -203,6 +208,7 @@ def main() -> None:
     displayed_params: Params = cast(Params, results["params"])
     displayed_metab_choice: str = cast(str, results["metab_choice"])
     displayed_aldh_choice: str = cast(str, results["aldh_choice"])
+    sim_rate: float = cast(float, results["sim_rate"])
 
     current_settings: dict[str, object] = {
         "drinks": drinks,
@@ -278,7 +284,7 @@ def main() -> None:
         time_hrs: float = float(metabolized.iloc[0]["time_hrs"])
         return f"{time_hrs:.2f} h"
 
-    auc_bac: float = float((df["bac_percent"] * displayed_params.dt).sum())
+    auc_bac: float = float((df["bac_percent"] * sim_rate).sum())
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Peak BAC", f"{peak.bac_percent:.3f}%")
@@ -316,7 +322,7 @@ def main() -> None:
         ax.plot(df["time_hrs"], df["intestine_ethanol_g"], label="Intestine ethanol", linewidth=2)
         ax.plot(df["time_hrs"], df["body_ethanol_g"], label="Body ethanol", linewidth=2)
         ax.plot(df["time_hrs"], df["acetaldehyde_g"], label="Acetaldehyde", linewidth=2)
-        ax.plot(df["time_hrs"], df["acetate_g"], label="Total Acetate", linewidth=2)
+        ax.plot(df["time_hrs"], df["acetate_g"], label="Total acetate", linewidth=2)
 
         add_drink_lines(ax)
 
@@ -328,15 +334,15 @@ def main() -> None:
         ax.legend(fontsize=7)
 
         st.pyplot(fig, use_container_width=True)
-    
+
     with graph_col3:
         st.write("Absorption and Elimination Rates")
 
         fig, ax = plt.subplots(figsize=(6, 3.5), constrained_layout=True)
 
-        ax.plot(df["time_hrs"], df["ethanol_absorption_g_h"], label="Ethanol absorption", linewidth=2,)
-        ax.plot(df["time_hrs"], df["ethanol_elimination_g_h"], label="Ethanol elimination", linewidth=2,)
-        ax.plot(df["time_hrs"], df["acetaldehyde_elimination_g_h"], label="Acetaldehyde elimination", linewidth=2,)
+        ax.plot(df["time_hrs"], df["ethanol_absorption_g_h"], label="Ethanol absorption", linewidth=2)
+        ax.plot(df["time_hrs"], df["ethanol_elimination_g_h"], label="Ethanol elimination", linewidth=2)
+        ax.plot(df["time_hrs"], df["acetaldehyde_elimination_g_h"], label="Acetaldehyde elimination", linewidth=2)
 
         add_drink_lines(ax)
 
@@ -354,7 +360,7 @@ def main() -> None:
 
         fig, ax = plt.subplots(figsize=(6, 3.5), constrained_layout=True)
 
-        ax.plot(df["time_hrs"], df["acetaldehyde_g"], label="Acetaldehyde amount", linewidth=2,)
+        ax.plot(df["time_hrs"], df["acetaldehyde_g"], label="Acetaldehyde amount", linewidth=2)
 
         add_drink_lines(ax)
 
@@ -369,8 +375,8 @@ def main() -> None:
 
     st.subheader("Extra Stats")
 
-    total_absorbed_g: float = float((df["ethanol_absorption_g_h"] * displayed_params.dt).sum())
-    total_metabolized_g: float = float((df["ethanol_elimination_g_h"] * displayed_params.dt).sum())
+    total_absorbed_g: float = float((df["ethanol_absorption_g_h"] * sim_rate).sum())
+    total_metabolized_g: float = float((df["ethanol_elimination_g_h"] * sim_rate).sum())
     max_absorption_rate: float = float(df["ethanol_absorption_g_h"].max())
     max_elimination_rate: float = float(df["ethanol_elimination_g_h"].max())
 
@@ -382,7 +388,9 @@ def main() -> None:
         print("Unreachable")
         return
 
-    acetaldehyde_exposure: float = float((df["acetaldehyde_concentration_mmol_l"] * displayed_params.dt).sum())
+    acetaldehyde_exposure: float = float(
+        (df["acetaldehyde_concentration_mmol_l"] * sim_rate).sum()
+    )
 
     alcohol_fully_absorbed_text: str = time_when_alcohol_fully_absorbed()
     alcohol_fully_metabolized_text: str = time_when_alcohol_fully_metabolized()
