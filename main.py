@@ -7,6 +7,18 @@ from matplotlib.axes import Axes
 
 @dataclass
 class Params:
+    """Dataclass for input params for the simulation
+
+    Raises:
+        ValueError: If duration is <= 0
+        ValueError: If drinks is < 0
+        ValueError: If food eaten is < 0
+        ValueError: If body mass is <= 0
+        ValueError: If the matabolism preset is <= 0
+        ValueError: If aldh efficiency is <= 0
+        ValueError: If body water fraction is <= 0
+        ValueError: If total time is <= 0
+    """
     drinks: float = 3
     duration: float = 2
     food_eaten: float = 250
@@ -34,9 +46,9 @@ class Params:
         if self.total_time <= 0:
             raise ValueError("total_time must be greater than 0")
 
-
 @dataclass
 class SimulationData:
+    """Data class for the data produced by the simulation"""
     time_hrs: float
     stomach_ethanol_g: float
     intestine_ethanol_g: float
@@ -54,8 +66,8 @@ class SimulationData:
     stomach_to_intestine_g_h: float
     bac_percent: float
 
-
 class Simulation:
+    """The alcohol absorption and metabolism simulation"""
     def __init__(self, params: Params | None = None):
         self.sim_rate: float = 1 / 600
         self.params = params if params is not None else Params()
@@ -68,6 +80,7 @@ class Simulation:
         self.sim_data: list[SimulationData] = []
 
     def step(self):
+        """Steps 1 tick in the simulation"""
         sr = self.sim_rate
         S = self.stomach_ethanol_g
         I = self.intestine_ethanol_g
@@ -120,12 +133,13 @@ class Simulation:
         self.sim_data.append(SimulationData(self.time_hrs, self.stomach_ethanol_g, self.intestine_ethanol_g, self.body_ethanol_g, self.acetaldehyde_g, self.acetate_g, C_ethanol, C_acetaldehyde, input_g_h, E_g_h, EH_g_h, ethanol_absorption_g_h, stomach_to_body_g_h, intestine_to_body_g_h, stomach_to_intestine_g_h, bac_percent))
 
     def simulate(self):
+        """Simulates for the given total time in the parameters"""
         while self.time_hrs < self.params.total_time:
             self.step()
             self.time_hrs += self.sim_rate
 
-
 def main() -> None:
+    """Main function"""
     st.set_page_config(page_title="BAC Simulation", layout="wide")
 
     st.title("Blood Alcohol Simulation")
@@ -152,6 +166,7 @@ def main() -> None:
         duration: float = float(st.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f"))
         food_eaten: int = int(st.slider("Food eaten (grams)", 0, 1500, 250, 50))
         body_mass: int = int(st.slider("Body mass (kg)", 30, 150, 70, 1))
+        body_water_fraction: int = int(st.slider("Body Water Fraction (%)", 50, 75, 68, 1))
         total_time: int = int(st.slider("Simulation time (hours)", 2, 32, 12, 1))
 
         metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
@@ -167,6 +182,7 @@ def main() -> None:
             body_mass=body_mass,
             metab_preset=metab_values[metab_choice],
             aldh_efficiency=aldh_values[aldh_choice],
+            body_water_fraction=body_water_fraction/100,
             total_time=total_time,
         )
 
@@ -242,6 +258,11 @@ def main() -> None:
         )
 
     def add_drink_lines(ax: Axes) -> None:
+        """Add dashed lines for each drink in black and a red dashed line for the last drink
+
+        Args:
+            ax (Axes): Graph to add the lines to
+        """
         for i, drink_time in enumerate(drink_times):
             if i == len(drink_times) - 1:
                 ax.axvline(drink_time, color="red", linestyle="--", linewidth=1.6, label="Last drink")
@@ -251,6 +272,14 @@ def main() -> None:
                 ax.axvline(drink_time, color="black", linestyle="--", linewidth=1.2, alpha=0.9)
 
     def threshold_interval(threshold: float) -> str:
+        """Gets the start time, end time, and duration in which the blood alcohol content is over a certain threshold
+
+        Args:
+            threshold (float): Threshold to get times when the blood alcohol content is over
+
+        Returns:
+            str: Formatted text of the start, end, and duration in which the blood alcohol content is greater than the threshold
+        """
         above = df[df["bac_percent"] >= threshold]["time_hrs"]
         if len(above) == 0:
             return "Never"
@@ -262,6 +291,11 @@ def main() -> None:
         return f"{start:.2f}-{end:.2f} h ({duration_at:.2f} h)"
 
     def time_when_alcohol_fully_absorbed() -> str:
+        """Gets the time when the alcohol is fully absorbed (gut ethanol <= 0.01g)
+
+        Returns:
+            str: The text "Not reached" or a formatted sring of the time
+        """
         gut_ethanol = df["stomach_ethanol_g"] + df["intestine_ethanol_g"]
         after_drinking = df[df["time_hrs"] >= displayed_params.duration].copy()
         after_drinking["gut_ethanol_g"] = gut_ethanol[df["time_hrs"] >= displayed_params.duration]
@@ -275,6 +309,11 @@ def main() -> None:
         return f"{time_hrs:.2f} h"
 
     def time_when_alcohol_fully_metabolized() -> str:
+        """Gets the time when the alcohol is fully metabolized (body ethanol <= 0.01g)
+
+        Returns:
+            str: The text "Not reached" or a formatted sring of the time
+        """
         after_peak = df[df["time_hrs"] >= peak.time_hrs]
         metabolized = after_peak[after_peak["body_ethanol_g"] <= 0.01]
 
@@ -433,7 +472,6 @@ def main() -> None:
 
     with st.expander("Show raw data"):
         st.dataframe(df)
-
 
 if __name__ == "__main__":
     main()
