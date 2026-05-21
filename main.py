@@ -121,17 +121,32 @@ class Simulation:
         dH_g_h = E_g_h * (44.053 / 46.068) - EH_g_h
         dAc_g_h = EH_g_h * (59.044 / 44.053)
 
+        # Cap the ethanol in each compartment to 0
         self.stomach_ethanol_g = max(S + sr * dS_g_h, 0)
         self.intestine_ethanol_g = max(I + sr * dI_g_h, 0)
         self.body_ethanol_g = max(B + sr * dB_g_h, 0)
         self.acetaldehyde_g = max(H + sr * dH_g_h, 0)
         self.acetate_g = max(Ac + sr * dAc_g_h, 0)
 
+        # recalculate values for accurate sim data
         C_ethanol = 1000 * self.body_ethanol_g / (46.068 * Vd_l)
         C_acetaldehyde = 1000 * self.acetaldehyde_g / (44.053 * Vd_l)
         bac_percent = self.body_ethanol_g / (self.params.body_water_fraction * self.params.body_mass * 10)
 
-        self.sim_data.append(SimulationData(self.time_hrs, self.stomach_ethanol_g, self.intestine_ethanol_g, self.body_ethanol_g, self.acetaldehyde_g, self.acetate_g, C_ethanol, C_acetaldehyde, input_g_h, E_g_h, EH_g_h, ethanol_absorption_g_h, stomach_to_body_g_h, intestine_to_body_g_h, stomach_to_intestine_g_h, bac_percent))
+        self.sim_data.append(SimulationData(self.time_hrs,
+                                            self.stomach_ethanol_g,
+                                            self.intestine_ethanol_g,
+                                            self.body_ethanol_g,
+                                            self.acetaldehyde_g,
+                                            self.acetate_g, C_ethanol,
+                                            C_acetaldehyde,
+                                            input_g_h,
+                                            E_g_h,
+                                            EH_g_h,
+                                            ethanol_absorption_g_h,
+                                            stomach_to_body_g_h,
+                                            intestine_to_body_g_h,
+                                            stomach_to_intestine_g_h, bac_percent))
 
     def simulate(self):
         """Simulates for the given total time in the parameters"""
