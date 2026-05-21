@@ -19,14 +19,14 @@ class Params:
         ValueError: If body water fraction is <= 0
         ValueError: If total time is <= 0
     """
-    drinks: float = 3
-    duration: float = 2
-    food_eaten: float = 250
-    body_mass: float = 70
-    metab_preset: float = 1.0
-    aldh_efficiency: float = 1.0
-    body_water_fraction: float = 0.68
-    total_time: float = 12
+    drinks: float = 3 # standard drinks = 14g ethanol
+    duration: float = 2 # how long drinking
+    food_eaten: float = 250 # g
+    body_mass: float = 70 # kg
+    metab_preset: float = 1.0 # from dropdown on site
+    aldh_efficiency: float = 1.0 # from dropdown on site
+    body_water_fraction: float = 0.68 # %
+    total_time: float = 12 # how long to simulate
 
     def __post_init__(self):
         if self.duration <= 0:
@@ -69,7 +69,7 @@ class SimulationData:
 class Simulation:
     """The alcohol absorption and metabolism simulation"""
     def __init__(self, params: Params | None = None):
-        self.sim_rate: float = 1 / 600
+        self.sim_rate: float = 1 / 600 # constant for accuracy
         self.params = params if params is not None else Params()
         self.time_hrs = 0.0
         self.stomach_ethanol_g = 0.0
@@ -88,6 +88,7 @@ class Simulation:
         H = self.acetaldehyde_g
         Ac = self.acetate_g
 
+        # Most of these equations are derived from science papers so they look messy and have constants that are just from real data, not magic numbers
         dose_g = 14 * self.params.drinks
         input_g_h = dose_g / self.params.duration if self.time_hrs < self.params.duration else 0
         food_factor = self.params.food_eaten / (self.params.food_eaten + 500)
@@ -189,8 +190,8 @@ def main() -> None:
         sim: Simulation = Simulation(params)
         sim.simulate()
 
-        df: pd.DataFrame = pd.DataFrame([asdict(point) for point in sim.sim_data])
-        peak: SimulationData = max(sim.sim_data, key=lambda point: point.bac_percent)
+        df: pd.DataFrame = pd.DataFrame([asdict(point) for point in sim.sim_data]) # easier to graph and do operations on every data point
+        peak: SimulationData = max(sim.sim_data, key=lambda point: point.bac_percent) # max BAC
         final: SimulationData = sim.sim_data[-1]
 
         drink_times: list[float] = []
@@ -246,6 +247,7 @@ def main() -> None:
         "aldh_choice": displayed_aldh_choice,
     }
 
+    # display if params changed but did not run
     if current_settings != last_run_settings:
         st.caption(
             f"Showing last run: {displayed_params.drinks:g} drinks, "
@@ -323,7 +325,7 @@ def main() -> None:
         time_hrs: float = float(metabolized.iloc[0]["time_hrs"])
         return f"{time_hrs:.2f} h"
 
-    auc_bac: float = float((df["bac_percent"] * sim_rate).sum())
+    auc_bac: float = float((df["bac_percent"] * sim_rate).sum()) # area under the BAC curve, BAC exposure
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Peak BAC", f"{peak.bac_percent:.3f}%")
@@ -420,15 +422,10 @@ def main() -> None:
     max_elimination_rate: float = float(df["ethanol_elimination_g_h"].max())
 
     peak_acetaldehyde = df.loc[df["acetaldehyde_g"].idxmax()]
-    try:
-        peak_acetaldehyde_g: float = float(peak_acetaldehyde["acetaldehyde_g"])
-        peak_acetaldehyde_time: float = float(peak_acetaldehyde["time_hrs"])
-    except ValueError:
-        return # Unreachable
+    peak_acetaldehyde_g: float = float(peak_acetaldehyde["acetaldehyde_g"]) # type: ignore
+    peak_acetaldehyde_time: float = float(peak_acetaldehyde["time_hrs"]) # type: ignore
 
-    acetaldehyde_exposure: float = float(
-        (df["acetaldehyde_concentration_mmol_l"] * sim_rate).sum()
-    )
+    acetaldehyde_exposure: float = float((df["acetaldehyde_concentration_mmol_l"] * sim_rate).sum())
 
     alcohol_fully_absorbed_text: str = time_when_alcohol_fully_absorbed()
     alcohol_fully_metabolized_text: str = time_when_alcohol_fully_metabolized()
