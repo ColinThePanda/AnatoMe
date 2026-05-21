@@ -11,3 +11,5 @@ And then
 ``` bash
 streamlit run main.py
 ```
+
+It is currently hosted [here](colin-anatome.streamlit.app)
