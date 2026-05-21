@@ -385,8 +385,7 @@ def main() -> None:
         peak_acetaldehyde_g: float = float(peak_acetaldehyde["acetaldehyde_g"])
         peak_acetaldehyde_time: float = float(peak_acetaldehyde["time_hrs"])
     except ValueError:
-        print("Unreachable")
-        return
+        return # Unreachable
 
     acetaldehyde_exposure: float = float(
         (df["acetaldehyde_concentration_mmol_l"] * sim_rate).sum()
