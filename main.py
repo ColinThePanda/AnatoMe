@@ -178,15 +178,15 @@ def main() -> None:
         st.session_state["results"] = None
 
     with st.sidebar.form("simulation_form"):
-        drinks: int = int(st.slider("Drinks consumed", 0, 12, 3, 1))
-        duration: float = float(st.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f"))
-        food_eaten: int = int(st.slider("Food eaten (grams)", 0, 1500, 250, 50))
-        body_mass: int = int(st.slider("Body mass (kg)", 30, 150, 70, 1))
-        body_water_fraction: int = int(st.slider("Body Water Fraction (%)", 50, 75, 68, 1))
-        total_time: int = int(st.slider("Simulation time (hours)", 2, 32, 12, 1))
+        drinks: int = int(st.slider("Drinks consumed", 0, 12, 3, 1)) # 0-12, default 3, step 1
+        duration: float = float(st.slider("Drinking duration (hours)", 0.1, 8.0, 2.0, 0.1, format="%.1f")) # 0.1-8.0, default 2.0, step 0.1
+        food_eaten: int = int(st.slider("Food eaten (grams)", 0, 1500, 250, 50)) # 0-1500, default 250, step 50
+        body_mass: int = int(st.slider("Body mass (kg)", 30, 150, 70, 1)) # 30-150, default 70, step 1
+        body_water_fraction: int = int(st.slider("Body Water Fraction (%)", 50, 75, 68, 1)) # 50-75, default 68, step 1
+        total_time: int = int(st.slider("Simulation time (hours)", 2, 32, 12, 1)) # 2-32, default 12, step 1
 
-        metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1))
-        aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0))
+        metab_choice: str = str(st.selectbox("Ethanol metabolism preset", ["Slow", "Average", "Fast"], index=1)) # default average
+        aldh_choice: str = str(st.selectbox("ALDH efficiency", ["Normal", "Reduced", "Very reduced"], index=0)) # default normal
 
         run: bool = bool(st.form_submit_button("Run simulation"))
 
@@ -342,6 +342,7 @@ def main() -> None:
 
     auc_bac: float = float((df["bac_percent"] * sim_rate).sum()) # area under the BAC curve, BAC exposure
 
+    # top main stats 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Peak BAC", f"{peak.bac_percent:.3f}%")
     col2.metric("Time to peak", f"{peak.time_hrs:.2f} h")
@@ -350,8 +351,8 @@ def main() -> None:
 
     st.subheader("Graphs")
 
-    graph_col1, graph_col2 = st.columns(2)
-    graph_col3, graph_col4 = st.columns(2)
+    graph_col1, graph_col2 = st.columns(2) # BAC and all compartments
+    graph_col3, graph_col4 = st.columns(2) # absorption/elimination and acetaldehyde
 
     with graph_col1:
         st.write("BAC Over Time")
@@ -468,7 +469,7 @@ def main() -> None:
         {"Stat": "Final acetate", "Value": f"{final.acetate_g:.2f} g"},
     ])
 
-    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    stat_col1, stat_col2, stat_col3 = st.columns(3) # BAC Timing, Ethanol Movement, Metabolism
 
     with stat_col1:
         st.markdown("#### BAC Timing")
